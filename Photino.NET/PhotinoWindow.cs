@@ -271,6 +271,7 @@ namespace PhotinoNET
         /// after the native PhotinoWindow instance was created.
         /// </summary>
         /// <param name="title">The window title</param>
+        /// <param name="startUrl">The initial page to navigate to</param>
         /// <param name="configure">PhotinoWindow options configuration</param>
         /// <param name="width">The window width</param>
         /// <param name="height">The window height</param>
@@ -279,12 +280,15 @@ namespace PhotinoNET
         /// <param name="fullscreen">Open window in fullscreen mode</param>
         public PhotinoWindow(
             string title,
+            string startUrl = "",
             Action<PhotinoWindowOptions> configure = null,
             int width = 800,
             int height = 600,
             int left = 20,
             int top = 20,
-            bool fullscreen = false)
+            bool fullscreen = false,
+            string windowIcon = "",
+            bool chromeless = false)
         {
             _managedThreadId = Thread.CurrentThread.ManagedThreadId;
 
@@ -315,7 +319,8 @@ namespace PhotinoNET
 
             _id = Guid.NewGuid();
             _parent = options.Parent;
-            _nativeInstance = Photino_ctor(_title, _parent?._nativeInstance ?? default, onWebMessageReceivedDelegate, fullscreen, left, top, width, height);
+            _nativeInstance = Photino_ctor(_title, startUrl, _parent?._nativeInstance ?? default,
+                onWebMessageReceivedDelegate, fullscreen, left, top, width, height, windowIcon, chromeless);
 
             // Register handlers that depend on an existing
             // Photino.Native instance.
@@ -845,11 +850,25 @@ namespace PhotinoNET
                 Console.WriteLine($"Executing: \"{this.Title ?? "PhotinoWindow"}\".Center()");
 
             Size workAreaSize = this.MainMonitor.WorkArea.Size;
+            Point centeredPosition;
 
-            Point centeredPosition = new Point(
-                ((workAreaSize.Width / 2) - (this.Width / 2)),
-                ((workAreaSize.Height / 2) - (this.Height / 2))
-            );
+            if (!PhotinoWindow.IsMacOsPlatform)
+            {
+                centeredPosition = new Point(
+                    ((workAreaSize.Width / 2) - (this.Width / 2)),
+                    ((workAreaSize.Height / 2) - (this.Height / 2))
+                );
+            }
+            else
+            {
+                // Due to the hacky MoveTo behavior of ypos
+                // under macOS, we need to flip the height offset
+                // here in order to properly center the window.
+                centeredPosition = new Point(
+                    ((workAreaSize.Width / 2) - (this.Width / 2)),
+                    ((workAreaSize.Height / 2) + (this.Height / 2))
+                );
+            }
 
             return this.MoveTo(centeredPosition);
         }
@@ -1244,7 +1263,7 @@ namespace PhotinoNET
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)] static extern IntPtr Photino_register_win32(IntPtr hInstance);
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)] static extern IntPtr Photino_getHwnd_win32(IntPtr instance);
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)] static extern IntPtr Photino_register_mac();
-        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Auto)] static extern IntPtr Photino_ctor(string title, IntPtr parentPhotinoNET, WebMessageReceivedDelegate webMessageReceivedCallback, bool fullscreen, int x, int y, int width, int height);
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Auto)] static extern IntPtr Photino_ctor(string title, string startUrl, IntPtr parentPhotinoNET, WebMessageReceivedDelegate webMessageReceivedCallback, bool fullscreen, int x, int y, int width, int height, string windowIcon, bool chromeless);
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)] static extern void Photino_dtor(IntPtr instance);
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Auto)] static extern void Photino_SetTitle(IntPtr instance, string title);
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)] static extern void Photino_Show(IntPtr instance);
